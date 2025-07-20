@@ -105,12 +105,12 @@ module Melody
         # Compute the melody index 
         awspCardinality = length(mss.AVSPWRTPN)     # Cardinality of AVSPWRTPN (as a set of unique elements)
         pow = awspCardinality^(Int(mss.n) - 1)      # Max needed pow of AVSPWRTPN's (set) cardinality
-        melody_index = Int64(1)                     # We take 1 to be the lowest possible melody index 
+        melody_index = Int64(0)                     # We take 0 to be the lowest possible melody index 
 
         for k in 1:Int(mss.n)
             j = avsp_matching_element_index[k]
             melody_index += (j-1)*pow
-            pow = div(pow, awspCardinality)         # Beware! pow /= awspCardinality  produces a FLOAT64
+            pow = div(pow, awspCardinality)         # Beware! 'pow /= awspCardinality' would produce a FLOAT64
         end
 
         return melody_index
@@ -122,25 +122,30 @@ module Melody
     """
     function getMelodyFromIndex(mss::MelodySampleSpace, index::UInt64)::Vector{Int8}
         # Validate input arguments
-        @assert (index >= 1)             ArgumentError("index ($index) cannot be lower than 1")
-        @assert (index <= mss.spaceSize) ArgumentError("index ($index) cannot be greater than $(mss.spaceSize)")
-        # Derive a Vector{Int8} array with mss.n elements, 
-        # each one also being an element of mss.AVSPWRTPN.
+        @assert (index >= 0)             ArgumentError("index ($index) cannot be lower than 0")
+        @assert (index < mss.spaceSize)  ArgumentError("index ($index) must be lower than $(mss.spaceSize)")
+        
+        # Derive a Vector{Int8} array with mss.n elements, each one also being an element of mss.AVSPWRTPN.
+        avspCardinality = UInt64(length(mss.AVSPWRTPN)) # Cardinality of AVSPWRTPN (as a set of unique elements)
+        pow    = UInt64(avspCardinality)^(Int(mss.n))   # AVSPWRTPN's cardinality power of melodies AVSP (**) 
 
-        awspCardinality = length(mss.AVSPWRTPN)     # Cardinality of AVSPWRTPN (as a set of unique elements)
-        pow    = awspCardinality^(Int(mss.n) - 1)   # Max needed pow of AVSPWRTPN's (set) cardinality
-
-        melody = zeros(Int8, mss.n)                 # Initialize melody with  mss.n  zeros
-        windex = index                              # Avoid messing with the input argument
+        melody = zeros(Int8, mss.n)                     # Initialize melody with  mss.n  zeros
+        windex = index                                  # Avoid messing with the input argument
         for k in 1:Int(mss.n)
-            divisor = div(windex, pow)
-            melody[k] = mss.AVSPWRTPN[Int8(divisor) + 1]    # Julia array indexing starts at 1 !!
-            windex -= pow * divisor
-            pow    /= awspCardinality
-            println("k: $k, melody[$k]: $(melody[k])" )
+            pow  = UInt64(pow / avspCardinality)        # Cardinality power associated to the k-th AVSP element 
+            println("k: $k, melody[$k]: $(melody[k]), type of pow: $(typeof(pow)),  pow(k): $(pow)" )
+            divisor = div(windex, pow)                  # Divisor MUST be in the range  0:length(mss.AVSPWRTPN)-1
+            println("k=$k, windex=$windex, divisor=$(Int8(divisor)), pow = $(Int(pow))")
+            melody[k] = mss.AVSPWRTPN[Int8(divisor)+1]  # Julia array indexing is 1-based, yet divisor can be zero!
+            windex -= Int(pow * divisor)
+            # pow  = UInt64(pow / avspCardinality)      # Moved to the loop's beginning, as explained below (**)
         end
 
         return melody
+        # (**) Initializing UInt64(avspCardinality)^(Int(mss.n)), although the max power of avspCardinality that 
+        # is required for representing all possible melodies is avspCardinality^(Int(mss.n) - 1). Our choice 
+        # here is done just so that the pow's value can be made available with the 1ST instruction of the 
+        # following for-loop over k, rather than with the LAST one (as it would otherwise be necessary).
     end
 
     """
