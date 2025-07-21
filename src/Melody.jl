@@ -2,6 +2,7 @@ module Melody
 
     export MelodySampleSpace, makeMelodySampleSpace
     export getZero, getMelodyIndex, getMelodyFromIndex, isCircular
+    export generateSample
 
     """
     MelodySampleSpace defines criteria for generating a melody,
@@ -149,18 +150,19 @@ module Melody
 
     """
 	I M P O R T A N T   O B S E R V A T I O N  on  C I R C U L A R   melodies
-	The chance is not zero that the sum of the n-1 AVSP's in a particular melody be zero. 
+	The sum of the <n> AVSP's in a particular melody may be zero. 
 	We refer to sequences with this property as   C I R C U L A R . 
 	The following scheme (where '|' is a note and 'a,b,c...' are AVSP's) should explain why 
 	
-	|a|b|c|_|_|_|_|_|_|_|_|_|_|_|_|_|x|y|z|a|b|c|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|x|y|z|
-	 1 2 3 . . . . . . . . . . . . . . . n 1 2 3 . . . . . . . . . . . . . . . . . n
+	0 1 2 3 . . . . . . . . . . . . . . n 0 1 2 3 . . . . . . . . . . . . . . . . n 0	:  n+1 NOTES per melody
+    |a|b|c|_|_|_|_|_|_|_|_|_|_|_|_|_|x|y|z|a|b|c|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|x|y|z|
+	 1 2 3 . . . . . . . . . . . . . . . n 1 2 3 . . . . . . . . . . . . . . . . . n    :  n   AVSPs per melody
 	
 	Let the sum a+b+c+ ... + x+y+z be zero. But a,b,c,... represent intervals (in pitch)
 	between two consecutive sounds. Thus |a| is the interval between sounds 1 and 2, etc.
-	If and only if the SUM a+b+c+...+x+y+z = 0 can we assert that sound 1 and sound n are
-	the  S A M E  sound. When this happens we say that a particular sequence of intervals 
-    is   C I R C U L A R
+	Iff the SUM a+b+c+...+x+y+z = 0 we assert that the k-th and the (k+n)-th  notes
+	have the same sound pitch, i.e. they are the S A M E  note.
+    When this happens we say that a particular melody (sequence of AVSPs)  is   C I R C U L A R
 	 
 	This method returns true  IFF a melody with the given index is  C I R C U L A R 
 	 
@@ -176,6 +178,14 @@ module Melody
 
         return (sum == 0)
 
+    end
+
+    """
+    Generate random melodies to form a sample of the specified size
+    """
+    function generateSample(mss::MelodySampleSpace, sampleSize::UInt64; seed::Int = 123)::Vector{UInt64}
+        rng=MersenneTwister(seed)
+        sample = rand(rng, 0 : mss.spaceSize - 1, sampleSize)
     end
 
 end # module
