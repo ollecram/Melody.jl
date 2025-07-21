@@ -1,5 +1,7 @@
 module Melody
 
+    using Random
+
     export MelodySampleSpace, makeMelodySampleSpace
     export getZero, getMelodyIndex, getMelodyFromIndex, isCircular
     export generateSample
@@ -183,9 +185,14 @@ module Melody
     """
     Generate random melodies to form a sample of the specified size
     """
-    function generateSample(mss::MelodySampleSpace, sampleSize::UInt64; seed::Int = 123)::Vector{UInt64}
-        rng=MersenneTwister(seed)
-        sample = rand(rng, 0 : mss.spaceSize - 1, sampleSize)
+    function generateSample(mss::MelodySampleSpace, sampleSize::UInt64; 
+                            seed::Int = 123, 
+                            range::UnitRange{UInt64} = UInt64(0):UInt64(mss.spaceSize - 1),
+                            xoshiro::Bool = true)::Vector{UInt64}
+
+        rng = xoshiro ? Xoshiro(seed) : MersenneTwister(seed)
+        
+        sample = rand(rng, range, sampleSize)
     end
 
 end # module

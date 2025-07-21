@@ -1,4 +1,7 @@
 using Melody
+using Random
+
+# 1. Basic tests
 
 mss = makeMelodySampleSpace(UInt8(12), UInt8(5))
 
@@ -16,6 +19,10 @@ test_lowest  = getMelodyFromIndex(mss, lowest_index)
 
 test_highest = getMelodyFromIndex(mss, highest_index)
 (test_highest == highest_melody) || println("Test_highest ERROR: \n$(highest_melody) != \n$(test_highest)")
+
+# 2. Generate random sample 
+
+sample = generateSample(mss, UInt64(1000))
 
 #==============================================================================================
 using Test
