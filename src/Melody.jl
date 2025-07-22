@@ -3,7 +3,8 @@ module Melody
     using Random
 
     export MelodySampleSpace, makeMelodySampleSpace
-    export getZero, getMelodyIndex, getMelodyFromIndex, isCircular
+    export getZero, getMelodyIndex, getMelodyFromIndex
+    export getMelodyOffset, getMelodyAttributes
     export generateSample, allMelodies
 
     """
@@ -151,9 +152,36 @@ module Melody
     end
 
     """
-	I M P O R T A N T   O B S E R V A T I O N  on  C I R C U L A R   melodies
+	We call  melody  O F F S E T  the sum of the <n> AVSP's in a melody. 
+	When this sum is zero, we refer to the corresponding melody as being C L O S E D. 
+	The following scheme (where '|' is a note and 'a,b,c...' are AVSP's) should explain why 
+	
+	0 1 2 3 . . . . . . . . . . . . . . n 0 1 2 3 . . . . . . . . . . . . . . . . n 0	:  n+1 NOTES per melody
+    |a|b|c|_|_|_|_|_|_|_|_|_|_|_|_|_|x|y|z|a|b|c|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|x|y|z|
+	 1 2 3 . . . . . . . . . . . . . . . n 1 2 3 . . . . . . . . . . . . . . . . . n    :  n   AVSPs per melody
+	
+	a,b,c,... represent intervals (in pitch) between two consecutive sounds. 
+    Thus |a| is the interval between sounds 1 and 2, etc.
+	The SUM a+b+c+...+x+y+z defines the  O F F S E T  between k-th and the (k+n)-th note.
+	"""
+    function getMelodyOffset(melodyIndex::UInt64, mss::MelodySampleSpace)::Int
+        avsp = getMelodyFromIndex(melodyIndex, mss)
+        off = 0
+        for k in 1:mss.n    
+            off += avsp[k]
+        end
+        return off
+    end
+
+    """
+	O B S E R V A T I O N S   on   C L O S E D   and   C I R C U L A R   melodies
 	The sum of the <n> AVSP's in a particular melody may be zero. 
-	We refer to sequences with this property as   C I R C U L A R . 
+	We refer to sequences with this property as   C L O S E D. 
+
+    The sum of the <n> AVSP's of a particular melody, within a given melody sample space (mss), 
+    may or may NOT be equal to one of the  <n> AVSP's associated with that mss. IFF it is, 
+    then we qualify the melody as  C I R C U L A R 
+
 	The following scheme (where '|' is a note and 'a,b,c...' are AVSP's) should explain why 
 	
 	0 1 2 3 . . . . . . . . . . . . . . n 0 1 2 3 . . . . . . . . . . . . . . . . n 0	:  n+1 NOTES per melody
@@ -164,23 +192,29 @@ module Melody
 	between two consecutive sounds. Thus |a| is the interval between sounds 1 and 2, etc.
 	Iff the SUM a+b+c+...+x+y+z = 0 we assert that the k-th and the (k+n)-th  notes
 	have the same sound pitch, i.e. they are the S A M E  note.
-    When this happens we say that a particular melody (sequence of AVSPs)  is   C I R C U L A R
-	 
-	This method returns true  IFF a melody with the given index is  C I R C U L A R 
-	 
+    When this happens we say that a particular melody (sequence of AVSPs)  is   C L O S E D
+	When the above SUM equals one of the values in mss.AVSPWRTPN, we say it is  C I R C U L A R 
 	"""
-    function isCircular(melodyIndex::UInt64, mss::MelodySampleSpace)::Bool
-        # Remind: there is one AVSP less in a melody than there are notes
+    function getMelodyAttributes(melodyIndex::UInt64, mss::MelodySampleSpace)::Tuple{Bool, Bool}
+        off = getMelodyOffset(melodyIndex, mss)
+        closed = (off == 0)
+        circular = (off in mss.AVSPWRTPN)
 
-        avsp = getMelodyFromIndex(melodyIndex, mss)
-        sum = 0
-        for k in 1:mss.n    
-            sum += avsp[k]
-        end
-
-        return (sum == 0)
-
+        return (closed, circular)
     end
+    
+    
+    """
+    This method of the function getMelodyAttribute works directly with the melody's AVSP
+    """
+    function getMelodyAttributes(melody::Vector{Int8}, mss::MelodySampleSpace)::Tuple{Bool, Bool}
+        off = sum(melody)
+        closed = (off == 0)
+        circular = (off in mss.AVSPWRTPN)
+
+        return (closed, circular)
+    end
+
 
     """
     Generate random sample of melodies of the specified size
@@ -196,11 +230,16 @@ module Melody
     end
 
     """
-    Return a matrix (Array{Int8, 2}), each of whose <m>^<n> columns contains the representation 
+    Build the matrix (Array{Int8, 2}), each of whose <m>^<n> columns contains the representation 
     of a melody by the corresponding sequence of <n> Int8 values, each taken from mss.AVSPWRTPN
     The matrix columns are ordered so that the k-th column stores the melody of index k
+
+    Build the vector of tuples (Vector{Tuple{Bool, Bool}}}), each one of whose elements contains 
+    two Boolean attributes of the corresponding melody: 'isClosed' and  'isCircular'  
+
+    The function returns the matrix and the vector as elements of a tuple.
     """
-    function allMelodies(n::UInt8, m::UInt8; allowZero::Bool = true, ramLimitGb = 33)::Matrix{Int8}
+    function allMelodies(n::UInt8, m::UInt8; allowZero::Bool = true, ramLimitGb = 33)::Tuple{Matrix{Int8}, Vector{Tuple{Bool, Bool}}}
 
         # 0. Instantiate the melody sample space
         mss = makeMelodySampleSpace(n::UInt8, m::UInt8; allowZero) 
@@ -223,9 +262,32 @@ module Melody
         end
         t3 = time()
         println("Generating and storing columns required $(t3-t2) seconds")
+
+        # 3. Preallocate space to hold a Tuple{Bool, Bool} for each melody
+        vector = Vector{Tuple{Bool, Bool}}(undef, mss.spaceSize) 
+
+        # 4. Evaluate and store the attributes (isClosed, isCircular) for each melody
+        nofClosed = 0
+        nofCircular = 0
+        nofBoth = 0
+        for melody_index in UInt64(0):UInt64(mss.spaceSize - 1)
+            melody = matrix[:, melody_index+1]      # retrieve the melody from matrix column
+            attributes = getMelodyAttributes(melody, mss)
+
+            # Take statistics:
+            if attributes[1] nofClosed += 1; end
+            if attributes[2] nofCircular += 1; end
+            if attributes[1] && attributes[2] nofBoth += 1; end
+
+            vector[melody_index+1] = attributes
+        end
+        t4 = time()
+
+        println("closed: $nofClosed, circular: $nofCircular, both: $nofBoth")
+        println("Generating and storing attributes required $(t4-t3) seconds")
         
-        # 3. Return the matrix
-        matrix
+        # 5. Return the matrix and the vector
+        (matrix, vector)
     end
 
 
