@@ -4,7 +4,7 @@ module Melody
 
     export MelodySampleSpace, makeMelodySampleSpace
     export getZero, getMelodyIndex, getMelodyFromIndex, isCircular
-    export generateSample
+    export generateSample, allMelodies
 
     """
     MelodySampleSpace defines criteria for generating a melody,
@@ -135,9 +135,9 @@ module Melody
         windex = index                                  # Avoid messing with the input argument
         for k in 1:Int(mss.n)
             pow  = UInt64(pow / avspCardinality)        # Cardinality power associated to the k-th AVSP element 
-            println("k: $k, melody[$k]: $(melody[k]), type of pow: $(typeof(pow)),  pow(k): $(pow)" )
+            # println("k: $k, melody[$k]: $(melody[k]), type of pow: $(typeof(pow)),  pow(k): $(pow)" )
             divisor = div(windex, pow)                  # Divisor MUST be in the range  0:length(mss.AVSPWRTPN)-1
-            println("k=$k, windex=$windex, divisor=$(Int8(divisor)), pow = $(Int(pow))")
+            # println("k=$k, windex=$windex, divisor=$(Int8(divisor)), pow = $(Int(pow))")
             melody[k] = mss.AVSPWRTPN[Int8(divisor)+1]  # Julia array indexing is 1-based, yet divisor can be zero!
             windex -= Int(pow * divisor)
             # pow  = UInt64(pow / avspCardinality)      # Moved to the loop's beginning, as explained below (**)
@@ -183,7 +183,7 @@ module Melody
     end
 
     """
-    Generate random melodies to form a sample of the specified size
+    Generate random sample of melodies of the specified size
     """
     function generateSample(mss::MelodySampleSpace, sampleSize::UInt64; 
                             seed::Int = 123, 
@@ -194,5 +194,39 @@ module Melody
         
         sample = rand(rng, range, sampleSize)
     end
+
+    """
+    Return a matrix (Array{Int8, 2}), each of whose <m>^<n> columns contains the representation 
+    of a melody by the corresponding sequence of <n> Int8 values, each taken from mss.AVSPWRTPN
+    The matrix columns are ordered so that the k-th column stores the melody of index k
+    """
+    function allMelodies(n::UInt8, m::UInt8; allowZero::Bool = true, ramLimitGb = 33)::Matrix{Int8}
+
+        # 0. Instantiate the melody sample space
+        mss = makeMelodySampleSpace(n::UInt8, m::UInt8; allowZero) 
+
+        # 1. Check there is enough RAM available for the output matrix, as per declared limit
+        ramNeededGb = (mss.spaceSize * n) / 1024^3
+        println("RAM needed (Gb): $ramNeededGb")
+        @assert(ramNeededGb <= ramLimitGb, "RAM needed (Gb): $ramNeededGb, RAM limit: ramLimitGb")
+
+        t1 = time()
+        matrix = zeros(Int8, n, mss.spaceSize)
+        t2 = time()
+
+        println("Matrix memory allocation alone required $(t2-t1) seconds")
+
+        # 2. Store a distinct melody (AVSPWRTPN sequence) in each column of matrix
+
+        for melody_index in UInt64(0):UInt64(mss.spaceSize - 1)
+            matrix[:, melody_index+1] = getMelodyFromIndex(mss, melody_index) 
+        end
+        t3 = time()
+        println("Generating and storing columns required $(t3-t2) seconds")
+        
+        # 3. Return the matrix
+        matrix
+    end
+
 
 end # module
