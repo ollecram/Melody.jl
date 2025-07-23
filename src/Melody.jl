@@ -1,11 +1,13 @@
 module Melody
 
+    using Dictionaries
     using Random
 
     export MelodySampleSpace, makeMelodySampleSpace
     export getZero, getMelodyIndex, getMelodyFromIndex
     export getMelodyOffset, getMelodyAttributes
     export generateSample, allMelodies
+    export melodyClassesRepresentative
 
     """
     MelodySampleSpace defines criteria for generating a melody,
@@ -239,10 +241,10 @@ module Melody
 
     The function returns the matrix and the vector as elements of a tuple.
     """
-    function allMelodies(n::UInt8, m::UInt8; allowZero::Bool = true, ramLimitGb = 33)::Tuple{Matrix{Int8}, Vector{Tuple{Bool, Bool}}}
+    function allMelodies(mss::MelodySampleSpace; ramLimitGb = 33)::Tuple{Matrix{Int8}, Vector{Tuple{Bool, Bool}}}
 
-        # 0. Instantiate the melody sample space
-        mss = makeMelodySampleSpace(n::UInt8, m::UInt8; allowZero) 
+        # 0. Extract info from mss argument (melody sample space)
+        n = mss.n
 
         # 1. Check there is enough RAM available for the output matrix, as per declared limit
         ramNeededGb = (mss.spaceSize * n) / 1024^3
@@ -290,5 +292,63 @@ module Melody
         (matrix, vector)
     end
 
+
+    """
+    For any   C I R C U L A R    melody it is possible(*) to generate a
+    number of other melodies by 'rotating' the sequence of AVSP's
+    clock-wise (or counter-clock-wise) in unit steps. 
+
+    INPUTs: mss    :  the melody sample space
+            matrix :  whose k-th column contains the melody of index k
+            vector :  whose k-th element is the tuple (isClosed::Bool, isCircular::Bool) 
+
+    OUTPUT: This function returns a Dictionary{UInt64, UInt64} where the Key is a valid
+            melody index ( number in the unit range UInt64(0):UInt64(mss.spaceSize - 1) ) 
+            The corresponding value is the minimum UInt64 value within the set of indices 
+            obtained by 'rotating' melody elements in matrix[:, k]. That set includes the 
+            input melody_index as well as indices of all 'rotated' melodies.
+
+        (*) In principle, the mapping could also be applied to a NON CIRCULAR melody. 
+            In that case, however, one or more 'rotated' melodies woud NOT satisfy the
+            requirement of belonging to the melody sample space ( mss input argument ), 
+            as one or more melody elements would not be an element of mss.AVSPWRTPN !
+    """
+    function melodyClassesRepresentative(mss::MelodySampleSpace, matrix::Matrix{Int8}, vector::Vector{Tuple{Bool, Bool}})::Dictionary{UInt64, UInt64}
+
+        dictionary = Dictionary{UInt64, UInt64}()
+
+        nonCircularCount = UInt64(0)
+
+        for melody_index in UInt64(0):UInt64(mss.spaceSize - 1)
+            melody = matrix[:, melody_index + 1]
+            (isClosed, isCircular) = vector[melody_index + 1]
+
+            # Logic to exclude melodies which are non  C I R C U L A R
+            if isCircular 
+                # Generate the index of all other members in the melody's EC
+                minIndex = mss.spaceSize        # integer above the max possible index
+
+                lastInMelody = melody[mss.n]
+                for k in 1:mss.n - 1
+                    melody[k+1] = melody[k]
+                end
+                melody[1] = lastInMelody
+
+                index = getMelodyIndex(mss, melody)
+
+                if (index < minIndex) minIndex = index end
+
+                insert!(dictionary, melody_index, minIndex) # see https://juliapackages.com/p/dictionaries
+
+            else    # if isCircular
+                nonCircularCount += 1
+            end     # if isCircular
+        end     # for melody_index...
+
+        println("melodyClassesRepresentatives() : found $nonCircularCount NON-CIRCULAR melodies in the sample space")
+
+        return dictionary
+
+    end     #function melodyClassesRepresentative
 
 end # module
