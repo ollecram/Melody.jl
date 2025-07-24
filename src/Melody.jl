@@ -295,23 +295,25 @@ module Melody
 
     """
     For any   C I R C U L A R    melody it is possible(*) to generate a
-    number of other melodies by 'rotating' the sequence of AVSP's
-    clock-wise (or counter-clock-wise) in unit steps. 
+    number of other melodies by 'rotating' the sequence of AVSP's, clock-wise 
+    (or counter-clock-wise), in unit steps. 
 
-    INPUTs: mss    :  the melody sample space
-            matrix :  whose k-th column contains the melody of index k
-            vector :  whose k-th element is the tuple (isClosed::Bool, isCircular::Bool) 
+    INPUTs: mss    :  the melody sample space  
+                      Assume k ∈ 1:mss.spaceSize, i.e. 1:length(mss.AVSPWRTPN)^(mss.n) 
+            matrix :  k-th column of which contains the melody of index (k-1) 
+            vector :  k-th element of which is tuple (isClosed::Bool, isCircular::Bool):
+                      attributes also associated to the melody of index (k-1) 
 
     OUTPUT: This function returns a Dictionary{UInt64, UInt64} where the Key is a valid
             melody index ( number in the unit range UInt64(0):UInt64(mss.spaceSize - 1) ) 
             The corresponding value is the minimum UInt64 value within the set of indices 
             obtained by 'rotating' melody elements in matrix[:, k]. That set includes the 
-            input melody_index as well as indices of all 'rotated' melodies.
+            input melody_index as well as indices of any 'rotated' melody.
 
         (*) In principle, the mapping could also be applied to a NON CIRCULAR melody. 
             In that case, however, one or more 'rotated' melodies woud NOT satisfy the
             requirement of belonging to the melody sample space ( mss input argument ), 
-            as one or more melody elements would not be an element of mss.AVSPWRTPN !
+            as one or more melody elements would NOT be an element of mss.AVSPWRTPN !
     """
     function melodyClassesRepresentative(mss::MelodySampleSpace, matrix::Matrix{Int8}, vector::Vector{Tuple{Bool, Bool}})::Dictionary{UInt64, UInt64}
 
@@ -320,34 +322,52 @@ module Melody
         nonCircularCount = UInt64(0)
 
         for melody_index in UInt64(0):UInt64(mss.spaceSize - 1)
-            melody = matrix[:, melody_index + 1]
-            (isClosed, isCircular) = vector[melody_index + 1]
+            melody = matrix[:, melody_index + 1]                # + 1 because array indices in Julia are 1-based
+            (isClosed, isCircular) = vector[melody_index + 1]   # + 1 because array indices in Julia are 1-based
 
-            # Logic to exclude melodies which are non  C I R C U L A R
-            if isCircular 
-                # Generate the index of all other members in the melody's EC
+            # println("melody_index: $melody_index, melody: $melody, isCircular: $isCircular")       # DEBUGGING
+ 
+            # Exclude melodies which are non  C I R C U L A R (**)
+            if isCircular
+                # Generate the index of all other members in the melody's Equivalence Class (EC)
                 minIndex = mss.spaceSize        # integer above the max possible index
+                for step in 1:(mss.n - 1)
+                    # println("step: $step")                                                         # DEBUGGING
 
-                lastInMelody = melody[mss.n]
-                for k in 1:mss.n - 1
-                    melody[k+1] = melody[k]
-                end
-                melody[1] = lastInMelody
+                    lastInMelody = melody[mss.n]
+                    # https://stackoverflow.com/questions/62444721/how-to-implement-a-decrementing-for-loop-in-julia
+                    for k = mss.n : -1 : 2      
+                        melody[k] = melody[k-1] # 1-step clockwise 'rotation' of the melody
+                    end
+                    melody[1] = lastInMelody
 
-                index = getMelodyIndex(mss, melody)
+                    index = getMelodyIndex(mss, melody)
+                    if (index < minIndex) minIndex = index end
 
-                if (index < minIndex) minIndex = index end
+                    # println("step: $step, melody: $melody, index: $index, minIndex: $minIndex")     # DEBUGGING
 
+                end #   for rotation_step in 1:mss.n - 1
+                
                 insert!(dictionary, melody_index, minIndex) # see https://juliapackages.com/p/dictionaries
 
+                # println("melody_index: $melody_index - minIndex: $minIndex")                        # DEBUGGING
+
             else    # if isCircular
+
                 nonCircularCount += 1
+
             end     # if isCircular
         end     # for melody_index...
 
-        println("melodyClassesRepresentatives() : found $nonCircularCount NON-CIRCULAR melodies in the sample space")
+        #  vkeys = vkeys = sort(collect(keys(dictionary)))   # vector of sorted dictionary keys
+
+        println("melodyClassesRepresentative() : found $nonCircularCount NON-CIRCULAR melodies in the sample space")
 
         return dictionary
+
+        #   (**)Otherwise, repeating a melody sequentially two or more times would produce a sequence where the 
+        #       variation of sound pitch (VSP) at the juncture of two consecutive instances of the melody would 
+        #       NOT be an element of the melody sample space's mss.AVSPWRTPN[] array 
 
     end     #function melodyClassesRepresentative
 
