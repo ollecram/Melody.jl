@@ -7,7 +7,7 @@ module Melody
     export getZero, getMelodyIndex, getMelodyFromIndex
     export getMelodyOffset, getMelodyAttributes
     export generateSample, allMelodies
-    export melodyClassesRepresentative
+    export melodyClassesRepresentative, melodyIndexToEquivalenceClass
 
     """
     MelodySampleSpace defines criteria for generating a melody,
@@ -198,6 +198,7 @@ module Melody
 	When the above SUM equals one of the values in mss.AVSPWRTPN, we say it is  C I R C U L A R 
 	"""
     function getMelodyAttributes(melodyIndex::UInt64, mss::MelodySampleSpace)::Tuple{Bool, Bool}
+
         off = getMelodyOffset(melodyIndex, mss)
         closed = (off == 0)
         circular = (off in mss.AVSPWRTPN)
@@ -321,45 +322,50 @@ module Melody
 
         nonCircularCount = UInt64(0)
 
-        for melody_index in UInt64(0):UInt64(mss.spaceSize - 1)
+        for melody_index in UInt64(0):UInt64(mss.spaceSize - 1) # melody_index starts at UInt64(0) !
             melody = matrix[:, melody_index + 1]                # + 1 because array indices in Julia are 1-based
             (isClosed, isCircular) = vector[melody_index + 1]   # + 1 because array indices in Julia are 1-based
 
-            # println("melody_index: $melody_index, melody: $melody, isCircular: $isCircular")       # DEBUGGING
- 
-            # Exclude melodies which are non  C I R C U L A R (**)
             if isCircular
-                # Generate the index of all other members in the melody's Equivalence Class (EC)
-                minIndex = mss.spaceSize        # integer above the max possible index
-                for step in 1:(mss.n - 1)
-                    # println("step: $step")                                                         # DEBUGGING
+                # Empty vector of indices to keep all members of an equivalence class of rotation-related melodies
+                ecIndices=UInt64[]
+                push!(ecIndices, melody_index)
 
-                    lastInMelody = melody[mss.n]
+                # Generate the index of all other members in the melody's Equivalence Class (EC)
+                minIndex = melody_index         # representative index cannot exceed a melody's index !!
+
+                for rot_step in 1:(mss.n - 1)
+                    lastInMelody = melody[mss.n]    # this is the first element to be replaced!
+
                     # https://stackoverflow.com/questions/62444721/how-to-implement-a-decrementing-for-loop-in-julia
                     for k = mss.n : -1 : 2      
                         melody[k] = melody[k-1] # 1-step clockwise 'rotation' of the melody
                     end
                     melody[1] = lastInMelody
-
+                    
                     index = getMelodyIndex(mss, melody)
-                    if (index < minIndex) minIndex = index end
+                    push!(ecIndices, index)
 
-                    # println("step: $step, melody: $melody, index: $index, minIndex: $minIndex")     # DEBUGGING
+                    if (index < minIndex) 
+                        minIndex = index 
+                    end
 
-                end #   for rotation_step in 1:mss.n - 1
-                
-                insert!(dictionary, melody_index, minIndex) # see https://juliapackages.com/p/dictionaries
+                end #   for rot_step in 1:mss.n - 1
 
-                # println("melody_index: $melody_index - minIndex: $minIndex")                        # DEBUGGING
-
+                # We are now ready to map all elements in ecIndices[] to minIndex!
+                for melody_index in ecIndices
+                    if haskey(dictionary, melody_index)
+                        dictionary[melody_index] = minIndex         # see https://juliapackages.com/p/dictionaries
+                    else
+                        insert!(dictionary, melody_index, minIndex) # see https://juliapackages.com/p/dictionaries
+                    end
+                end
             else    # if isCircular
 
                 nonCircularCount += 1
 
             end     # if isCircular
         end     # for melody_index...
-
-        #  vkeys = vkeys = sort(collect(keys(dictionary)))   # vector of sorted dictionary keys
 
         println("melodyClassesRepresentative() : found $nonCircularCount NON-CIRCULAR melodies in the sample space")
 
@@ -370,5 +376,28 @@ module Melody
         #       NOT be an element of the melody sample space's mss.AVSPWRTPN[] array 
 
     end     #function melodyClassesRepresentative
+
+
+    """
+    This function takes in input mss::MelodySampleSpace and index::UInt64, the latter being the index of 
+    a melody which belongs to the given melody sample space (mss). 
+    In output, it returns:
+        - a sorted vector with indices of all elements of the corresponding equivalence class (EC)
+        - a matrix whose k-th column is the melody whose index is found at the k-th vector element
+
+    """
+    function melodyIndexToEquivalenceClass(dictionary::Dictionary{UInt64, UInt64}, melody_index::UInt64)::(Vector{UInt64})
+
+        # 1. Find the EC representative of melody 
+        ecIndex = dictionary[melody_index]                # The EC representative of the given melody (index) 
+        ecTest(x::UInt64) = x == ecIndex                  # Returns true IFF input arg equals ecIndex (see below)
+
+        # 2. Extract all keys mapping to ecIndex
+        class = collect(findall(ecTest, dictionary))      # This is a vector of UInt64 
+
+        # 3. Return class after sorting 
+        sort(class)
+
+    end
 
 end # module
