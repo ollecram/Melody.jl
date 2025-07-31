@@ -27,14 +27,17 @@ mss_withZero    = makeMelodySampleSpace(UInt8(8), UInt8(5); allowZero = true)
 mss_withoutZero = makeMelodySampleSpace(UInt8(8), UInt8(5); allowZero = false)
 
 (matrix1, vector1) = allMelodies(mss_withZero)
+    #> closed: 9377467, circular: 97464799, both: 9377467   [with mss_withZero, ALL closed are also circular]
+
 (matrix2, vector2) = allMelodies(mss_withoutZero)
+    #> closed: 4161710, circular: 39318000, both: 0         [with mss_withoutZero, closed cannot be circular]
 
 dict1 = melodyClassesRepresentative(mss_withZero, matrix1, vector1)
-	#> melodyClassesRepresentative() : found 10109704 NON-CIRCULAR melodies in the sample space
+	#> melodyClassesRepresentative() : 116894082 NON-CIRCULAR melodies in the sample space
 	#> 97464799-element Dictionaries.Dictionary{UInt64, UInt64}
 
 dict2 = melodyClassesRepresentative(mss_withoutZero, matrix2, vector2)
-	#> melodyClassesRepresentative() : found  5838290 NON-CIRCULAR melodies in the sample space
+	#> melodyClassesRepresentative() : found 60682000 NON-CIRCULAR melodies in the sample space
 	#> 39318000-element Dictionaries.Dictionary{UInt64, UInt64}
 
 # Below, focus on melodies whose index is found before the middle of a sorted list of CIRCULAR melodies     
@@ -51,13 +54,20 @@ for melody_index in melody_indices_1
     eqClass = melodyIndexToEquivalenceClass(dict1, melody_index)
     println("\t melody index: $(melody_index), Equiv class Cardinality: $(length(eqClass))") 
 end
+#> melody index: 107179439, Equiv class Cardinality: 8	|  In this short sample of 4 cases, all
+#> melody index:  73413378, Equiv class Cardinality: 8	|  the examined equivalence classes have
+#> melody index:  46371675, Equiv class Cardinality: 8	|  the MAXIMUM possible cardinality (8)
+#> melody index:  33609929, Equiv class Cardinality: 8	|  
 
 println("\n ===== Data on 4 Equiv classes with mss.AVSPWRTPN NOT including the ZERO =====") 
 for melody_index in melody_indices_2
     eqClass = melodyIndexToEquivalenceClass(dict2, melody_index)
     println("\t melody index: $(melody_index), Equiv class Cardinality: $(length(eqClass))") 
 end
-
+#> melody index:  49999100, Equiv class Cardinality: 8	|  In this short sample of 4 cases, all
+#> melody index:  34499651, Equiv class Cardinality: 8	|  the examined equivalence classes have
+#> melody index:  21391787, Equiv class Cardinality: 8	|  the MAXIMUM possible cardinality (8)
+#> melody index:  15781027, Equiv class Cardinality: 8	|
 
 # Below, find instructions on how to make use of the above results ( n o t   v e r i f i e d ):
 #
