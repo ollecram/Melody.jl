@@ -1,0 +1,15 @@
+Youtube Lesson from https://www.youtube.com/watch?v=QEWuUZg0xGs
+
+	Getting started with GPU computing [HPC in Julia] by Jamie Mair
+
+		CUDA.jl Array Programming  at https://github.com/MPAGS-HPC-in-Julia/gpi-demo
+
+	How to install CUDA.jl:
+	
+		pkg> add CUDA
+		julia> using CUDA
+
+
+
+
+ 
