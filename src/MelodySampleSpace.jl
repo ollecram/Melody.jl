@@ -1,3 +1,4 @@
+ using Random
  """
     MelodySampleSpace defines criteria for generating a melody,
         i.e. a sequence of music notes subject to constraints such 
@@ -33,7 +34,7 @@
 
         # The number of distinct melodies satisfying the above two criteria,
         # the maximum value of which clearly equals  length(ASPV)^n 
-        spaceSize::UInt64
+        instances::UInt64
 
         # (*) For the purposes of this software, any two melodies are considered the SAME melody
         #     if one can be obtained from the other by applying a uniform translation of pitch!
@@ -52,15 +53,15 @@
     function makeMelodySampleSpace(n::UInt8, m::UInt8; allowZero::Bool = true) 
         if allowZero
             ASPV = Int8[-Int8(m):1:Int8(m);]
-            spaceSize = UInt64((2m+1)^n)
+            instances = UInt64((2m+1)^n)
         else
             ASPV = zeros(Int8, 2*m)
             ASPV[  1: m] = Int8[-Int8(m):1:Int8(-1);]
             ASPV[m+1:2m] = Int8[ Int8(1):1:Int8( m);]
-            spaceSize = UInt64((2m)^n)
+            instances = UInt64((2m)^n)
         end
         
-        MelodySampleSpace(n, ASPV, spaceSize)
+        MelodySampleSpace(n, ASPV, instances)
         
     end # function
 
@@ -73,10 +74,10 @@
 
 
     """
-    Return the UInt64 integer value in the interval [0 : mss.spaceSize - 1] 
+    Return the UInt64 integer value in the interval [0 : mss.instances - 1] 
     uniquely determined by the input Int8[] array of mss.n elements 
     Note 1: The MIN value that a melody index can assume is 0
-    Note 2: The MAX value that a melody index can assume is (mss.spaceSize - 1)  ! Beware of the '-1' !
+    Note 2: The MAX value that a melody index can assume is (mss.instances - 1)  ! Beware of the '-1' !
     Note 3: All 'intervals' in the melody with the MIN index equal mss.ASPV[1]
     Note 4: All 'intervals' in the melody with the MAX index equal mss.ASPV[L] (L ASPV's length) 
     """
@@ -115,17 +116,16 @@
 
     """
     Return the melody as an Int8[] array of AVSP from a UInt64 integer value in
-    the interval [0 : mss.spaceSize - 1], to be interpreted as the melody index. 
+    the interval [0 : mss.instances - 1], to be interpreted as the melody index. 
     Note 1: The MIN value that a melody index can assume is 0
-    Note 2: The MAX value that a melody index can assume is (mss.spaceSize - 1)  ! Beware of the '-1' !
+    Note 2: The MAX value that a melody index can assume is (mss.instances - 1)  ! Beware of the '-1' !
     Note 3: All 'intervals' in the melody with the MIN index equal mss.ASPV[1]
     Note 4: All 'intervals' in the melody with the MAX index equal mss.ASPV[L] (L ASPV's length) 
     """
     function getMelodyFromIndex(mss::MelodySampleSpace, index::UInt64)::Vector{Int8}
         # Validate input arguments
         @assert (index >= 0)             ArgumentError("index ($index) cannot be lower than 0")
-        @assert (index < mss.spaceSize)  ArgumentError("index ($index) must be lower than $(mss.spaceSize)")
-        
+        @assert (index < mss.instances)  ArgumentError("index ($index) must be lower than $(mss.instances)")
         # Derive a Vector{Int8} array with mss.n elements, each one also being an element of mss.ASPV.
         avspCardinality = UInt64(length(mss.ASPV)) # Cardinality of ASPV (as a set of unique elements)
         pow    = UInt64(avspCardinality)^(Int(mss.n))   # ASPV's cardinality power of melodies AVSP (**) 
@@ -238,31 +238,33 @@
 
     The function returns the matrix and the vector as elements of a tuple.
     """
-    function allMelodies(mss::MelodySampleSpace; ramLimitGb = 33)::Tuple{Matrix{Int8}, Vector{Tuple{Bool, Bool}}}
+    function allMelodies(mss::MelodySampleSpace; NATTRIBS = 3, ramLimitGb = 33)::Tuple{Matrix{Int8}, Matrix{Int16}}
 
         # 0. Extract info from mss argument (melody sample space)
         n = mss.n
 
         # 1. Check there is enough RAM available for the output matrix, as per declared limit
-        ramNeededGb = (mss.spaceSize * n) / 1024^3
+        ramNeededGb = (mss.instances * n) / 1024^3
         println("RAM needed (Gb): $ramNeededGb")
         @assert(ramNeededGb <= ramLimitGb, "RAM needed (Gb): $ramNeededGb, RAM limit: ramLimitGb")
 
         t1 = time()
-        matrix = zeros(Int8, n, mss.spaceSize)
+        melodies   = zeros(Int8, n, mss.instances)
         t2 = time()
 
         println("Matrix memory allocation alone required $(t2-t1) seconds")
 
         # 2. Store a distinct melody (ASPV sequence) in each column of matrix
 
-        for melody_index in UInt64(0):UInt64(mss.spaceSize - 1)
-            matrix[:, melody_index+1] = getMelodyFromIndex(mss, melody_index) 
+        for melody_index in UInt64(0):UInt64(mss.instances - 1)
+            melodies[:, melody_index+1] = getMelodyFromIndex(mss, melody_index) 
         end
         t3 = time()
         println("Generating and storing columns required $(t3-t2) seconds")
 
-        # 3. Preallocate space to hold a Tuple{Bool, Bool} for each melody
-        vector = Vector{Tuple{Bool, Bool}}(undef, mss.spaceSize) 
+        # 3. Preallocate space to hold attributes (NATTRIBS for each melody)
+        attributes = zeros(Int16, NATTRIBS, mss.instances)
 
+        # 4. Return the pair (melodies, attributes)
+        return (melodies, attributes)
     end
